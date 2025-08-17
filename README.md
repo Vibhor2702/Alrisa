@@ -64,4 +64,9 @@ If you'd like to run Alrisa on your own machine, you can get it set up with just
 ## 📂 Project Structure
 
 Here’s how I've organized the project files:
+/
+├── app.py # The main Streamlit application script
+├── requirements.txt # Python dependencies
+└── style.css # Custom CSS for the "Nothing" theme
+
 
