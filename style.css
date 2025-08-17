@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
+
+/* Main App Styling */
+body {
+    background-color: #000000 !important;
+    color: #FFFFFF !important;
+}
+
+/* Title and Header Font */
+h1, h2, h3 {
+    font-family: 'DotGothic16', sans-serif !important;
+    color: #FFFFFF !important;
+    text-transform: uppercase;
+}
+
+/* Red Accent for Buttons */
+.stButton > button {
+    border: 2px solid #FF0000;
+    border-radius: 5px;
+    background-color: #000000;
+    color: #FF0000;
+    font-family: 'DotGothic16', sans-serif;
+    text-transform: uppercase;
+}
+.stButton > button:hover {
+    background-color: #FF0000;
+    color: #FFFFFF;
+}
+
+/* Sidebar Styling */
+.st-emotion-cache-16txtl3 {
+    background-color: #1a1a1a;
+}
+
+/* Dataframe and Info Boxes */
+.stDataFrame, .stAlert {
+    border: 1px solid #333333;
+    border-radius: 5px;
+}
