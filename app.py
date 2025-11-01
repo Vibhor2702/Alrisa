@@ -191,14 +191,20 @@ def train_model():
                 results['metric'] = 'RMSE & R²'
         
         else:  # Unsupervised
+            # Filter only numeric columns
             df_proc = df[feature_columns].dropna()
-            X = df_proc[feature_columns]
+            numeric_cols = df_proc.select_dtypes(include=[np.number]).columns.tolist()
+            
+            if len(numeric_cols) == 0:
+                return jsonify({'error': 'No numeric columns selected. Please select numeric features for unsupervised learning.'}), 400
+            
+            X = df_proc[numeric_cols]
             
             models_map = {
                 "K-Means": KMeans(n_clusters=3, random_state=42),
                 "DBSCAN": DBSCAN(),
-                "PCA": PCA(n_components=2),
-                "t-SNE": TSNE(n_components=2, random_state=42)
+                "PCA": PCA(n_components=min(2, len(numeric_cols))),
+                "t-SNE": TSNE(n_components=min(2, len(numeric_cols)), random_state=42)
             }
             
             model = models_map.get(model_choice)
@@ -210,6 +216,8 @@ def train_model():
             else:
                 X_tf = model.fit_transform(X)
                 results['transformed_shape'] = X_tf.shape
+            
+            results['numeric_features_used'] = numeric_cols
         
         # Generate code snippet
         code = generate_code_snippet(task, model_choice, target_column, feature_columns)
