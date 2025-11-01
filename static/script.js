@@ -297,13 +297,42 @@ function displayResults(data, task) {
             `;
         });
         resultsContent.innerHTML = clustersHTML;
-    } else if (task === 'Dimensionality Reduction' && data.transformed_shape) {
-        resultsContent.innerHTML = `
+    } else if (task === 'Dimensionality Reduction' && data.transformed_data) {
+        let html = `
             <div class="result-metric">
-                <span class="result-label">Transformed Shape</span>
+                <span class="result-label">Original Shape</span>
                 <span class="result-value">${data.transformed_shape[0]} × ${data.transformed_shape[1]}</span>
             </div>
+            <div class="result-metric">
+                <span class="result-label">Showing Rows</span>
+                <span class="result-value">${data.showing_rows}</span>
+            </div>
+            <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--accent-primary);">Transformed Data Preview</h4>
+            <div style="overflow-x: auto; background: var(--bg-tertiary); border-radius: 12px; padding: 1rem; border: 1px solid var(--border-color);">
+                <table>
+                    <thead>
+                        <tr>
         `;
+        
+        // Headers
+        if (data.transformed_data.length > 0) {
+            Object.keys(data.transformed_data[0]).forEach(key => {
+                html += `<th>${key}</th>`;
+            });
+            html += `</tr></thead><tbody>`;
+            
+            // Rows
+            data.transformed_data.forEach(row => {
+                html += '<tr>';
+                Object.values(row).forEach(value => {
+                    html += `<td>${typeof value === 'number' ? value.toFixed(4) : value}</td>`;
+                });
+                html += '</tr>';
+            });
+        }
+        
+        html += `</tbody></table></div>`;
+        resultsContent.innerHTML = html;
     }
     
     // Display code

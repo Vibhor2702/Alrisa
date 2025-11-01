@@ -215,7 +215,14 @@ def train_model():
                 results['clusters'] = cluster_counts
             else:
                 X_tf = model.fit_transform(X)
+                # Convert transformed data to dataframe and send first 100 rows
+                transformed_df = pd.DataFrame(
+                    X_tf[:100],  # Limit to first 100 rows for display
+                    columns=[f'Component_{i+1}' for i in range(X_tf.shape[1])]
+                )
+                results['transformed_data'] = transformed_df.to_dict('records')
                 results['transformed_shape'] = X_tf.shape
+                results['showing_rows'] = min(100, X_tf.shape[0])
             
             results['numeric_features_used'] = numeric_cols
         
