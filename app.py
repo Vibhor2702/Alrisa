@@ -120,28 +120,34 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-    
-    if file and file.filename.endswith('.csv'):
-        try:
-            df = pd.read_csv(file)
-            eda_data = analyze_data(df)
-            
-            # Save the dataframe temporarily
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            df.to_csv(filepath, index=False)
-            
-            return jsonify({'success': True, 'filename': filename, 'eda': eda_data})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    return jsonify({'error': 'Invalid file format'}), 400
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'success': False, 'error': 'Invalid file format. Please upload a CSV file.'}), 400
+        
+        # Read and analyze the CSV
+        df = pd.read_csv(file)
+        eda_data = analyze_data(df)
+        
+        # Save the dataframe temporarily
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        df.to_csv(filepath, index=False)
+        
+        return jsonify({'success': True, 'filename': filename, 'eda': eda_data}), 200
+        
+    except pd.errors.EmptyDataError:
+        return jsonify({'success': False, 'error': 'The CSV file is empty'}), 400
+    except pd.errors.ParserError:
+        return jsonify({'success': False, 'error': 'Invalid CSV format'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Error processing file: {str(e)}'}), 500
 
 @app.route('/train', methods=['POST'])
 def train_model():

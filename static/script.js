@@ -91,6 +91,12 @@ async function handleFileUpload(event) {
             body: formData
         });
         
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Server returned invalid response. Please refresh the page and try again.');
+        }
+        
         const data = await response.json();
         
         if (data.success) {
@@ -111,6 +117,9 @@ async function handleFileUpload(event) {
             // Enable run button
             document.getElementById('runAnalysis').disabled = false;
             
+            // Hide results section if visible
+            document.getElementById('resultsSection').style.display = 'none';
+            
             // Hide welcome, show EDA
             document.getElementById('welcomeScreen').style.display = 'none';
             document.getElementById('edaSection').style.display = 'block';
@@ -118,8 +127,12 @@ async function handleFileUpload(event) {
             alert('Error: ' + data.error);
         }
     } catch (error) {
+        console.error('Upload error:', error);
         alert('Error uploading file: ' + error.message);
     }
+    
+    // Reset file input to allow uploading the same file again
+    event.target.value = '';
 }
 
 function displayEDA(eda) {
