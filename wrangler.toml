@@ -1,0 +1,16 @@
+name = "alrisa-automl"
+main = "app.py"
+compatibility_date = "2024-11-01"
+
+[build]
+command = "pip install -r requirements.txt"
+
+[vars]
+PYTHON_VERSION = "3.11"
+
+[[kv_namespaces]]
+binding = "UPLOADS"
+id = ""
+
+[observability]
+enabled = true

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alrisa - AutoML Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo">⚫ ALRISA</h1>
+                <p class="tagline">Automated Machine Learning Platform</p>
+            </div>
+            
+            <div class="upload-section">
+                <label for="fileUpload" class="upload-label">
+                    <div class="upload-icon">📁</div>
+                    <span>Upload CSV File</span>
+                </label>
+                <input type="file" id="fileUpload" accept=".csv" style="display: none;">
+                <div id="fileName" class="file-name"></div>
+            </div>
+
+            <div class="config-section">
+                <label class="input-label">1. Choose ML Task</label>
+                <select id="taskSelect" class="select-input">
+                    <option value="Classification">Classification</option>
+                    <option value="Regression">Regression</option>
+                    <option value="Clustering">Clustering</option>
+                    <option value="Dimensionality Reduction">Dimensionality Reduction</option>
+                </select>
+
+                <label class="input-label">2. Select Algorithm</label>
+                <select id="modelSelect" class="select-input">
+                    <!-- Options will be populated dynamically -->
+                </select>
+
+                <div id="targetSection" style="display: none;">
+                    <label class="input-label">3. Target Column</label>
+                    <select id="targetSelect" class="select-input">
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                </div>
+
+                <div id="featuresSection" style="display: none;">
+                    <label class="input-label">4. Feature Columns</label>
+                    <div id="featuresList" class="features-list">
+                        <!-- Checkboxes will be populated dynamically -->
+                    </div>
+                </div>
+
+                <button id="runAnalysis" class="btn-primary" disabled>
+                    🚀 Run Analysis
+                </button>
+            </div>
+
+            <div class="help-section">
+                <button id="helpToggle" class="btn-secondary">
+                    💬 Need Help?
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div id="welcomeScreen" class="welcome-screen">
+                <div class="welcome-content">
+                    <h2>Welcome to Alrisa</h2>
+                    <p>Upload a CSV file to begin your machine learning journey</p>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="feature-icon">🎯</div>
+                            <h3>Classification</h3>
+                            <p>Predict categories and classes</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">📈</div>
+                            <h3>Regression</h3>
+                            <p>Predict numerical values</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">🔍</div>
+                            <h3>Clustering</h3>
+                            <p>Discover data patterns</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">📊</div>
+                            <h3>Analysis</h3>
+                            <p>Automated EDA & insights</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="edaSection" style="display: none;">
+                <h2>📊 Exploratory Data Analysis</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Rows</div>
+                        <div id="rowCount" class="stat-value">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Columns</div>
+                        <div id="colCount" class="stat-value">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Missing Values</div>
+                        <div id="missingCount" class="stat-value">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Numeric Cols</div>
+                        <div id="numericCount" class="stat-value">-</div>
+                    </div>
+                </div>
+
+                <div class="data-preview">
+                    <h3>Data Preview</h3>
+                    <div id="dataTable"></div>
+                </div>
+
+                <div class="correlation-section" id="correlationSection" style="display: none;">
+                    <h3>Correlation Matrix</h3>
+                    <div id="correlationMatrix"></div>
+                </div>
+            </div>
+
+            <div id="resultsSection" style="display: none;">
+                <h2>📈 Results</h2>
+                <div id="resultsContent"></div>
+                
+                <div class="code-section">
+                    <h3>📝 Reproducible Code</h3>
+                    <pre id="codeSnippet"></pre>
+                    <button id="downloadCode" class="btn-secondary">Download Code</button>
+                </div>
+            </div>
+
+            <div id="loadingScreen" class="loading-screen" style="display: none;">
+                <div class="loader"></div>
+                <p>Training model...</p>
+            </div>
+        </main>
+
+        <!-- Chat Modal -->
+        <div id="chatModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>💬 Help Assistant</h3>
+                    <span class="close">&times;</span>
+                </div>
+                <div id="chatMessages" class="chat-messages"></div>
+                <div class="chat-input-container">
+                    <input type="text" id="chatInput" placeholder="Ask a question..." class="chat-input">
+                    <button id="chatSend" class="btn-primary">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

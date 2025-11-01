@@ -1,8 +1,7 @@
-streamlit
-pandas
-numpy
-scikit-learn
-pycaret[full]
-matplotlib
-seaborn
-graphviz
+Flask==3.0.0
+pandas==2.1.3
+numpy==1.26.2
+scikit-learn==1.3.2
+pycaret==3.1.0
+Werkzeug==3.0.1
+gunicorn==21.2.0

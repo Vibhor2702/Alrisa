@@ -1,15 +1,15 @@
-import streamlit as st
+from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 import numpy as np
 import os
-import matplotlib.pyplot as plt
-import seaborn as sns
-import base64
+import io
+import json
+from werkzeug.utils import secure_filename
 
 # --- PyCaret Imports ---
 try:
-    from pycaret.classification import setup as classification_setup, compare_models as classification_compare, pull as classification_pull, save_model as classification_save, plot_model as classification_plot
-    from pycaret.regression import setup as regression_setup, compare_models as regression_compare, pull as regression_pull, save_model as regression_save, plot_model as regression_plot
+    from pycaret.classification import setup as classification_setup, compare_models as classification_compare, pull as classification_pull, save_model as classification_save
+    from pycaret.regression import setup as regression_setup, compare_models as regression_compare, pull as regression_pull, save_model as regression_save
     PYCARET_AVAILABLE = True
 except ImportError:
     PYCARET_AVAILABLE = False
@@ -17,102 +17,43 @@ except ImportError:
 # --- Scikit-learn Imports ---
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, confusion_matrix, roc_curve, auc, mean_squared_error, r2_score, silhouette_score
+from sklearn.metrics import accuracy_score, confusion_matrix, mean_squared_error, r2_score
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.manifold import TSNE
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, export_graphviz, plot_tree
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC, SVR
 
-# --- Graphviz for Tree Visualization (Optional) ---
-try:
-    import graphviz
-    GRAPHVIZ_AVAILABLE = True
-except ImportError:
-    GRAPHVIZ_AVAILABLE = False
-
-
-# --- Page Configuration ---
-st.set_page_config(
-    page_title="Alrisa - AutoML App",
-    page_icon="⚫",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# --- Function to load local CSS ---
-def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
-# Apply the custom CSS
-local_css("style.css")
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['UPLOAD_FOLDER'] = 'uploads'
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # --- Helper Functions ---
 
-def show_eda(df):
-    """Displays the Exploratory Data Analysis section."""
-    st.subheader("📊 Exploratory Data Analysis")
-    st.write("Data Preview:")
-    st.dataframe(df.head())
-    st.write("Data Shape:", df.shape)
-    st.write("Data Types:")
-    st.dataframe(df.dtypes.rename("Data Type"))
-    st.write("Missing Values:")
-    st.dataframe(df.isnull().sum().rename("Missing Values"))
-
+def analyze_data(df):
+    """Returns EDA data as JSON."""
     numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
-    if numeric_cols:
-        st.write("Numeric Data Summary:")
-        st.dataframe(df[numeric_cols].describe())
-        st.write("Correlation Heatmap:")
-        fig, ax = plt.subplots(figsize=(10, 7))
-        sns.heatmap(df[numeric_cols].corr(), annot=False, cmap='coolwarm', ax=ax)
-        st.pyplot(fig)
-
-def show_model_visuals(task, model_choice, model=None, feature_names=None):
-    """Displays conceptual or actual model structure visuals with a fallback."""
-    st.subheader("📝 Model Structure & Concept")
-
-    concepts = {
-        "Random Forest": ("A Random Forest is an ensemble of many decision trees. It makes predictions by averaging the output of individual trees, which reduces overfitting and improves accuracy.", "https://i.imgur.com/kh1wJjC.png"),
-        "SVM": ("A Support Vector Machine (SVM) finds the optimal boundary (hyperplane) that best separates data points of different classes in the feature space.", "https://i.imgur.com/1S7fIgG.png"),
-    }
-
-    if model_choice.startswith("Auto"):
-        st.info("The 'Auto (PyCaret)' option will automatically test multiple algorithms and select the best one for your dataset.")
     
-    elif model_choice in ["Decision Tree", "Decision Tree Regressor"] and model is not None:
-        st.info("Displaying the structure of the trained Decision Tree.")
-        if GRAPHVIZ_AVAILABLE:
-            try:
-                dot_data = export_graphviz(model, out_file=None, feature_names=feature_names, class_names=(task == "Classification"), filled=True, rounded=True, max_depth=4)
-                st.graphviz_chart(dot_data)
-                st.caption("High-quality tree visualization (via Graphviz).")
-                return
-            except Exception:
-                st.warning("Graphviz visualization failed. Showing basic fallback plot.")
-        try:
-            fig, ax = plt.subplots(figsize=(15, 8))
-            plot_tree(model, ax=ax, feature_names=feature_names, filled=True, rounded=True, max_depth=4, fontsize=10)
-            st.pyplot(fig)
-            st.caption("Basic tree visualization (via scikit-learn).")
-        except Exception as e:
-            st.error(f"Could not generate tree plot: {e}")
-
-    elif model_choice in concepts:
-        desc, img_url = concepts[model_choice]
-        st.markdown(desc)
-        if img_url:
-            st.image(img_url, caption=f"Conceptual Diagram for {model_choice}")
-    else:
-        st.info("Conceptual information will be added soon.")
+    eda_data = {
+        'preview': df.head(10).to_dict('records'),
+        'shape': df.shape,
+        'dtypes': df.dtypes.astype(str).to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'columns': df.columns.tolist(),
+        'numeric_columns': numeric_cols
+    }
+    
+    if numeric_cols:
+        eda_data['summary'] = df[numeric_cols].describe().to_dict()
+        eda_data['correlation'] = df[numeric_cols].corr().to_dict()
+    
+    return eda_data
 
 def generate_code_snippet(task, model_choice, target, features):
     """Generates a downloadable Python code snippet."""
-    # (This function remains the same as provided in the previous step)
     if model_choice == "Auto (PyCaret)":
         lib = "classification" if task == "Classification" else "regression"
         return f"""
@@ -159,127 +100,133 @@ else:
 def get_chatbot_response(user_question):
     """A simple rule-based chatbot for user help."""
     user_question = user_question.lower()
-    if "upload" in user_question: return "To upload data, use the 'Upload your input CSV file' button in the sidebar. The file must be a CSV."
-    if "classification" in user_question: return "Classification predicts a category (e.g., 'spam' or 'not spam')."
-    if "regression" in user_question: return "Regression predicts a number (e.g., house price)."
-    if "clustering" in user_question: return "Clustering finds natural groups in your data without labels."
-    if "pycaret" in user_question: return "'Auto (PyCaret)' automatically finds the best model for your data."
+    if "upload" in user_question: 
+        return "To upload data, use the file upload area. The file must be a CSV."
+    if "classification" in user_question: 
+        return "Classification predicts a category (e.g., 'spam' or 'not spam')."
+    if "regression" in user_question: 
+        return "Regression predicts a number (e.g., house price)."
+    if "clustering" in user_question: 
+        return "Clustering finds natural groups in your data without labels."
+    if "pycaret" in user_question: 
+        return "'Auto (PyCaret)' automatically finds the best model for your data."
     return "I can help with questions about uploading data or terms like 'classification', 'regression', 'clustering', and 'PyCaret'. How can I assist?"
 
-# --- UI Layout ---
+# --- Flask Routes ---
 
-with st.sidebar:
-    st.title("Alrisa")
-    st.info("Automated Machine Learning Platform")
-    uploaded_file = st.file_uploader("Upload your input CSV file", type=["csv"])
-    task = st.selectbox("1. Choose the ML Task", ["Classification", "Regression", "Clustering", "Dimensionality Reduction"])
-    model_options = {
-        "Classification": ["Auto (PyCaret)", "Decision Tree", "Random Forest", "SVM", "Logistic Regression"],
-        "Regression": ["Auto (PyCaret)", "Decision Tree Regressor", "Random Forest Regressor", "Linear Regression", "SVR"],
-        "Clustering": ["K-Means", "DBSCAN"],
-        "Dimensionality Reduction": ["PCA", "t-SNE"],
-    }
-    if not PYCARET_AVAILABLE:
-        model_options["Classification"].pop(0); model_options["Regression"].pop(0)
-        st.warning("PyCaret not installed. 'Auto' mode disabled.")
-    model_choice = st.selectbox("2. Select an Algorithm", model_options[task])
+@app.route('/')
+def index():
+    return render_template('index.html', pycaret_available=PYCARET_AVAILABLE)
 
-with st.expander("Need Help? Click to Chat!"):
-    if "messages" not in st.session_state: st.session_state.messages = []
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]): st.markdown(message["content"])
-    if prompt := st.chat_input("Ask a question..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"): st.markdown(prompt)
-        with st.chat_message("assistant"):
-            response = get_chatbot_response(prompt)
-            st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
-
-st.title("Automated Machine Learning Workflow")
-
-if uploaded_file is not None:
-    data = pd.read_csv(uploaded_file)
-    show_eda(data)
-    st.markdown("---")
-    st.header("⚙️ Model Configuration")
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
     
-    if task in ["Classification", "Regression"]:
-        target_column = st.selectbox("Select Target Column", data.columns)
-        feature_columns = st.multiselect("Select Feature Columns", [c for c in data.columns if c != target_column], default=[c for c in data.columns if c != target_column and pd.api.types.is_numeric_dtype(data[c])])
-    else:
-        target_column = None
-        feature_columns = st.multiselect("Select Features for Analysis", [c for c in data.columns if pd.api.types.is_numeric_dtype(data[c])], default=[c for c in data.columns if pd.api.types.is_numeric_dtype(data[c])])
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if file and file.filename.endswith('.csv'):
+        try:
+            df = pd.read_csv(file)
+            eda_data = analyze_data(df)
+            
+            # Save the dataframe temporarily
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            df.to_csv(filepath, index=False)
+            
+            return jsonify({'success': True, 'filename': filename, 'eda': eda_data})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    return jsonify({'error': 'Invalid file format'}), 400
 
-    if st.button("🚀 Run Analysis"):
-        if not feature_columns:
-            st.warning("Please select at least one feature column.")
-        else:
-            with st.spinner('The magic is happening...'):
-                try:
-                    if model_choice == "Auto (PyCaret)":
-                        setup = classification_setup if task == "Classification" else regression_setup
-                        compare = classification_compare if task == "Classification" else regression_compare
-                        pull = classification_pull if task == "Classification" else regression_pull
-                        save = classification_save if task == "Classification" else regression_save
-                        plot = classification_plot if task == "Classification" else regression_plot
-                        
-                        show_model_visuals(task, model_choice)
-                        st.markdown("---"); st.header("📈 Results")
-                        setup(data=data, target=target_column, session_id=123, silent=True, html=False)
-                        best = compare()
-                        st.dataframe(pull())
-                        st.write("Best Model:", best)
-                        plot_types = ['confusion_matrix', 'auc'] if task == "Classification" else ['residuals', 'error']
-                        for p_type in plot_types:
-                            try: plot(best, plot=p_type, display_format='streamlit')
-                            except Exception: pass
-                        save(best, 'best_model_pipeline')
-                        with open('best_model_pipeline.pkl', 'rb') as f:
-                            st.download_button('Download Best Model', f, 'best_model.pkl')
-                    
-                    else: # Scikit-learn path
-                        df_proc = data[feature_columns + ([target_column] if target_column else [])].dropna()
-                        X = df_proc[feature_columns]
-                        y = df_proc.get(target_column)
-                        
-                        models_map = {
-                            "Decision Tree": DecisionTreeClassifier(random_state=42), "Random Forest": RandomForestClassifier(random_state=42),
-                            "SVM": SVC(), "Logistic Regression": LogisticRegression(),
-                            "Decision Tree Regressor": DecisionTreeRegressor(random_state=42), "Random Forest Regressor": RandomForestRegressor(random_state=42),
-                            "SVR": SVR(), "Linear Regression": LinearRegression(),
-                            "K-Means": KMeans(n_clusters=3, random_state=42), "DBSCAN": DBSCAN(), "PCA": PCA(n_components=2), "t-SNE": TSNE()
-                        }
-                        model = models_map.get(model_choice)
-                        
-                        show_model_visuals(task, model_choice, model if "Tree" in model_choice else None, feature_columns)
-                        st.markdown("---"); st.header("📈 Results")
-                        
-                        if y is not None: # Supervised
-                            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-                            model.fit(X_train, y_train)
-                            if task == "Classification":
-                                acc = model.score(X_test, y_test)
-                                st.write(f"Accuracy: {acc:.3f}")
-                            else:
-                                preds = model.predict(X_test)
-                                st.write(f"RMSE: {np.sqrt(mean_squared_error(y_test, preds)):.3f}")
-                                st.write(f"R-squared: {r2_score(y_test, preds):.3f}")
-                        else: # Unsupervised
-                            if hasattr(model, 'fit_predict'):
-                                labels = model.fit_predict(X)
-                                st.write("Cluster sizes:", pd.Series(labels).value_counts())
-                            else:
-                                X_tf = model.fit_transform(X)
-                                st.write("Transformed Data Preview:")
-                                st.dataframe(pd.DataFrame(X_tf).head())
-                    
-                    st.markdown("---"); st.header("📝 Reproducible Code")
-                    code = generate_code_snippet(task, model_choice, target_column, feature_columns)
-                    st.code(code, language="python")
-                    st.download_button("Download Code Snippet", code, "alrisa_snippet.py")
+@app.route('/train', methods=['POST'])
+def train_model():
+    try:
+        data = request.json
+        filename = data.get('filename')
+        task = data.get('task')
+        model_choice = data.get('model')
+        target_column = data.get('target')
+        feature_columns = data.get('features', [])
+        
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        df = pd.read_csv(filepath)
+        
+        results = {}
+        
+        if task in ["Classification", "Regression"]:
+            df_proc = df[feature_columns + [target_column]].dropna()
+            X = df_proc[feature_columns]
+            y = df_proc[target_column]
+            
+            models_map = {
+                "Decision Tree": DecisionTreeClassifier(random_state=42),
+                "Random Forest": RandomForestClassifier(random_state=42),
+                "SVM": SVC(random_state=42),
+                "Logistic Regression": LogisticRegression(random_state=42, max_iter=1000),
+                "Decision Tree Regressor": DecisionTreeRegressor(random_state=42),
+                "Random Forest Regressor": RandomForestRegressor(random_state=42),
+                "SVR": SVR(),
+                "Linear Regression": LinearRegression()
+            }
+            
+            model = models_map.get(model_choice)
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            model.fit(X_train, y_train)
+            
+            if task == "Classification":
+                acc = model.score(X_test, y_test)
+                results['accuracy'] = round(acc, 3)
+                results['metric'] = 'Accuracy'
+            else:
+                preds = model.predict(X_test)
+                rmse = np.sqrt(mean_squared_error(y_test, preds))
+                r2 = r2_score(y_test, preds)
+                results['rmse'] = round(rmse, 3)
+                results['r2'] = round(r2, 3)
+                results['metric'] = 'RMSE & R²'
+        
+        else:  # Unsupervised
+            df_proc = df[feature_columns].dropna()
+            X = df_proc[feature_columns]
+            
+            models_map = {
+                "K-Means": KMeans(n_clusters=3, random_state=42),
+                "DBSCAN": DBSCAN(),
+                "PCA": PCA(n_components=2),
+                "t-SNE": TSNE(n_components=2, random_state=42)
+            }
+            
+            model = models_map.get(model_choice)
+            
+            if hasattr(model, 'fit_predict'):
+                labels = model.fit_predict(X)
+                cluster_counts = pd.Series(labels).value_counts().to_dict()
+                results['clusters'] = cluster_counts
+            else:
+                X_tf = model.fit_transform(X)
+                results['transformed_shape'] = X_tf.shape
+        
+        # Generate code snippet
+        code = generate_code_snippet(task, model_choice, target_column, feature_columns)
+        results['code'] = code
+        results['success'] = True
+        
+        return jsonify(results)
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-                except Exception as e:
-                    st.error(f"An error occurred: {e}. Please check data and selections.")
-else:
-    st.info("Upload a CSV file from the sidebar to get started.")
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    question = data.get('question', '')
+    response = get_chatbot_response(question)
+    return jsonify({'response': response})
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=8080)
